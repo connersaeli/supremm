@@ -381,6 +381,7 @@ class Context():
             self.update_min_ts()
             if np.inf == self.min_ts:
                 done = True
+                data, description = None, None
 
             yield data, description
 
