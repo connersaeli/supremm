@@ -322,9 +322,10 @@ def main():
         resource = 'delta'
 
         if resource in resmap:
-            if entry.stat().st_mtime > last_mtime:
+            stat = entry.stat()
+            if stat.st_mtime > last_mtime and stat.st_size > 0:
                 process_file(entry, config, resmap[resource], args.dryrun)
-                mlog['last_mtime'] = max(mlog['last_mtime'], entry.stat().st_mtime)
+                mlog['last_mtime'] = max(mlog['last_mtime'], stat.st_mtime)
             else:
                 logging.debug("Skip old file %s", entry.path)
         else:
