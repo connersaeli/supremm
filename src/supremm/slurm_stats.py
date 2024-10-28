@@ -333,6 +333,7 @@ def main():
         if resource in resmap:
             stat = entry.stat()
             if stat.st_mtime > last_mtime and stat.st_size > 0:
+                logging.info(f"Processing file {entry}")
                 process_file(entry, config, resmap[resource], args.dryrun)
                 mlog['last_mtime'] = max(mlog['last_mtime'], stat.st_mtime)
             else:
