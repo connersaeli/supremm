@@ -111,7 +111,13 @@ def getexitcode(info, field):
     s = getfield(info, field)
 
     return_code = s['return_code']
-    signal = s['signal']['signal_id'] if 'signal' in s else 0
+    if 'signal' in s:
+        try:
+            signal = s['signal']['signal_id']
+        except KeyError:
+            signal = s['signal']['id']
+    else:
+        signal = 0
 
     if return_code is None:
         return_code = signal
@@ -327,7 +333,7 @@ def main():
                 process_file(entry, config, resmap[resource], args.dryrun)
                 mlog['last_mtime'] = max(mlog['last_mtime'], stat.st_mtime)
             else:
-                logging.debug("Skip old file %s", entry.path)
+                logging.debug("Skipping file %s", entry.path)
         else:
             logging.debug("Skip unknown resource %s", entry.path)
 
