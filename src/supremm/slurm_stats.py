@@ -59,7 +59,11 @@ def getarrayjobinfo(info, _ = None):
         json accounting record.
     """
     if 'array' in info and 'job_id' in info['array'] and info['array']['job_id'] != 0:
-        return (str(info['array']['job_id']) + "_" + str(info['array']['task_id']), info['array']['job_id'], info['array']['task_id'])
+        if isinstance(info['array']['task_id'], dict):
+            array_index = info['array']['task_id']['number']
+        else:
+            array_index = info['array']['task_id']
+        return (str(info['array']['job_id']) + "_" + str(array_index), info['array']['job_id'], info['array']['task_id'])
 
     return (str(info['job_id']), str(info['job_id']), -1)
 
@@ -222,7 +226,8 @@ def process_file(entry, config, resconf, dryrun):
     """
     job_count = 0
 
-    with gzip.open(entry.path, "r") as jfile:
+    #with gzip.open(entry.path, "r") as jfile:
+    with open(entry.path, "r") as jfile:
         alldata = json.load(jfile)
         with outputter.factory(config, resconf, dry_run=dryrun) as outdb:
             for data in alldata['jobs']:
@@ -285,7 +290,12 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.WARNING
     setuplogger(log_level)
 
-    exp = re.compile("^sacct_json_([a-z_]+)_([0-9]{4}-[0-9]{2}-[0-9]{2}).json.gz$")
+    # EXPANSE
+    #exp = re.compile("^sacct_json_([a-z_]+)_([0-9]{4}-[0-9]{2}-[0-9]{2}).json.gz$")
+
+    # DELTA
+    exp = re.compile("^([0-9]{4}-[0-9]{2}-[0-9]{2}).json$")
+    #exp = re.compile("^([a-z_]+).([0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}_[0-9]{2}_[0-9]{2}).([0-9]{4}-[0-9]{2}[0-9]{2}).json$")
 
     config = Config('../../config')
     resmap = {}
@@ -298,7 +308,7 @@ def main():
             mtch = exp.match(entry.name)
             if mtch:
                 entries.append((entry, mtch.group(1)))
-
+    logging.debug("{} entries matched".format(len(entries)))
 
     mlog = getrunlog()
     last_mtime = mlog['last_mtime']
@@ -307,7 +317,8 @@ def main():
 
     for fp in entries:
         entry = fp[0]
-        resource = fp[1]
+        #resource = fp[1]
+        resource = 'delta'
 
         if resource in resmap:
             if entry.stat().st_mtime > last_mtime:
