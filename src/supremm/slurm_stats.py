@@ -63,7 +63,8 @@ def getarrayjobinfo(info, _ = None):
             array_index = info['array']['task_id']['number']
         else:
             array_index = info['array']['task_id']
-        return (str(info['array']['job_id']) + "_" + str(array_index), info['array']['job_id'], info['array']['task_id'])
+
+        return (str(info['array']['job_id']) + "_" + str(array_index), info['array']['job_id'], array_index)
 
     return (str(info['job_id']), str(info['job_id']), -1)
 
