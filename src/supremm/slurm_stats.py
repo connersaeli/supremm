@@ -88,6 +88,7 @@ def starttime_ts(info):
     ts = None
     for step in info['steps']:
         ts1 = step['time']['start']
+        print(ts, ts1)
         if ts is None:
             ts = ts1
         else:
