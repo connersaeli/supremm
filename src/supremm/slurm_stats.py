@@ -113,10 +113,11 @@ def getexitcode(info, field):
 
     s = getfield(info, field)
 
-    return_code = s['return_code']
+    return_code = s['return_code'] if instanceof(s['return_code'], int) else s['return_code']['number']
+
     if 'signal' in s:
         try:
-            signal = s['signal']['signal_id']['number']
+            signal = s['signal']['signal_id']
         except KeyError:
             signal = s['signal']['id']['number']
     else:
