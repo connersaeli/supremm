@@ -116,9 +116,9 @@ def getexitcode(info, field):
     return_code = s['return_code']
     if 'signal' in s:
         try:
-            signal = s['signal']['signal_id']
+            signal = s['signal']['signal_id']['number']
         except KeyError:
-            signal = s['signal']['id']
+            signal = s['signal']['id']['number']
     else:
         signal = 0
 
