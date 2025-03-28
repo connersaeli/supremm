@@ -8,6 +8,8 @@ import re
 import gzip
 import os
 import logging
+import mimetypes
+from contextlib import contextmanager
 
 from ClusterShell.NodeSet import NodeSet
 from supremm.config import Config
@@ -113,7 +115,7 @@ def getexitcode(info, field):
 
     s = getfield(info, field)
 
-    return_code = s['return_code'] if isinstance(s['return_code'], int) else s['return_code']['number']
+    return_code = s['return_code']['number'] if isinstance(s['return_code'], dict) else s['return_code']
 
     if 'signal' in s:
         try:
@@ -140,6 +142,9 @@ def slurm_job_to_supremm(job, resource_id):
     job_uniq_id, local_job_id, local_job_array_index = getarrayjobinfo(job)
     ncpus = gettresvalue(job, 'cpu')
     exit_status =  getfield(job, 'state.current')
+
+    if isinstance(exit_status, list):
+        exit_status = exit_status[0]
 
     if exit_status == 'RUNNING':
         return None, None
@@ -232,13 +237,12 @@ def slurm_job_to_supremm(job, resource_id):
 
     return out, mdata
 
-def process_file(entry, config, resconf, dryrun):
+def process_file(entry, config, resconf, encoding, dryrun):
     """ process a slurm json file for a configured resource
     """
     job_count = 0
 
-    #with gzip.open(entry.path, "r") as jfile:
-    with open(entry.path, "r") as jfile:
+    with file_opener(entry.path, encoding) as jfile:
         alldata = json.load(jfile)
         with outputter.factory(config, resconf, dry_run=dryrun) as outdb:
             for data in alldata['jobs']:
@@ -264,35 +268,48 @@ def process_file(entry, config, resconf, dryrun):
                 if job_count % 500 == 0:
                     logging.info(f"Processed {job_count} jobs")
 
+@contextmanager
+def file_opener(filepath, encoding=''):
+    try:
+        if encoding is 'gzip':
+            with gzip.open(filepath, 'r') as gz:
+                yield gz
+        else:
+            with open(filepath, 'r') as f:
+                yield f
+    except OSError as e:
+        logging.error('An error occuring processing file %s', (filepath, e.message))
 
-def getrunlog():
+def getrunlog(log_file):
     """ Get the object containing the metadata from the most
         recent succesful run on the process
     """
     mlog = {'last_mtime': 0}
 
     try:
-        with open(RUNLOG_FILE, 'r', encoding='utf8') as fp:
+        with open(log_file, 'r', encoding='utf8') as fp:
             mlog = json.load(fp)
     except FileNotFoundError:
         pass
 
     return mlog
 
-def saverunlog(mlog):
+def saverunlog(mlog, log_file):
     """ Save to file the object containing the run metadata
     """
-    with open(RUNLOG_FILE, 'w', encoding='utf8') as fp:
+    with open(log_file, 'w', encoding='utf8') as fp:
         json.dump(mlog, fp, indent=4)
 
 def main():
     """ main entry point
     """
     parser = argparse.ArgumentParser(
-                    prog='slurm_stats',
-                    description='Process the json output of slurm\'s sacct command')
-
+        prog='slurm_stats',
+        description='Process the json output of slurm\'s sacct command'
+    )
     parser.add_argument('dirpath')
+    parser.add_argument('--regex', type=str)
+    parser.add_argument('-r', '--resource', nargs='?', const=None, type=str, default=None)
     parser.add_argument('--dryrun', '--dry-run', '--noop', '--no-op', action='store_true')
     parser.add_argument('-v', '--verbose', action='store_true')  # on/off flag
 
@@ -302,40 +319,49 @@ def main():
     setuplogger(log_level)
 
     # EXPANSE
-    #exp = re.compile("^sacct_json_([a-z_]+)_([0-9]{4}-[0-9]{2}-[0-9]{2}).json.gz$")
-
+    #"^sacct_json_(?P<resource>[a-z_]+)_(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2}).json.gz$"
     # DELTA
-    exp = re.compile("^([0-9]{4}-[0-9]{2}-[0-9]{2}).json$")
-    #exp = re.compile("^([a-z_]+).([0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}_[0-9]{2}_[0-9]{2}).([0-9]{4}-[0-9]{2}[0-9]{2}).json$")
+    #"(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})"
 
     config = Config('../../config')
     resmap = {}
     for r, resconf in config.resourceconfigs():
         resmap[r.lower().replace(' ', '_')] = resconf
 
+    exp = re.compile(args.regex)
     entries = []
     with os.scandir(args.dirpath) as it:
         for entry in it:
             mtch = exp.match(entry.name)
             if mtch:
-                entries.append((entry, mtch.group(1)))
+                mime, encoding = mimetypes.guess_type(mtch.group(0))
+                try:
+                    resource_match = mtch.group('resource')
+                except IndexError:
+                    # No resource in regex, default to arg
+                    resource_match = args.resource
+                entries.append((entry, resource_match, encoding))
     logging.debug("{} entries matched".format(len(entries)))
 
-    mlog = getrunlog()
+    resource = args.resource
+    if resource is None:
+        runlog = RUNLOG_FILE
+    else:
+        runlog = resmap[resource]['slurmstats_run_log']
+    mlog = getrunlog(runlog)
     last_mtime = mlog['last_mtime']
 
     entries.sort(key=lambda x: x[0].name)
-
     for fp in entries:
         entry = fp[0]
-        #resource = fp[1]
-        resource = 'delta'
-
+        if resource is None:
+            resource = fp[1]
+        encoding = fp[2]
         if resource in resmap:
             stat = entry.stat()
             if stat.st_mtime > last_mtime and stat.st_size > 0:
                 logging.info(f"Processing file {entry}")
-                process_file(entry, config, resmap[resource], args.dryrun)
+                process_file(entry, config, resmap[resource], encoding, args.dryrun)
                 mlog['last_mtime'] = max(mlog['last_mtime'], stat.st_mtime)
             else:
                 logging.debug("Skipping file %s", entry.path)
@@ -344,7 +370,7 @@ def main():
 
 
     if not args.dryrun:
-        saverunlog(mlog)
+        saverunlog(mlog, runlog)
 
 if __name__ == "__main__":
     main()
