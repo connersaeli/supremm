@@ -19,10 +19,8 @@ def main():
     with open("supremm_expect_log", "wb") as f:
         p = pexpect.spawn('supremm-setup')
         p.logfile = f
-        
         p.expect("Select an option")
         p.sendline("c")
-        
         p.expect("Enter path to configuration files")
         p.sendline()
         p.expect("Do you wish to specify the XDMoD install directory")
@@ -42,7 +40,7 @@ def main():
             p.sendline("y")
             if i != 0:
                 p.expect("Data collector backend \(pcp or prometheus\)")
-                if i <= 4: 
+                if i <= 4:
                     config_pcp(p)
                 elif i == 5:
                     config_prometheus(p)
@@ -82,12 +80,12 @@ def main():
         p.expect("Enter path to configuration files")
         p.sendline()
         p.expect("URI")
-        p.sendline("mongodb://localhost/supremm")
+        p.sendline("mongodb://root:xdmod@mongo/supremm?authSource=admin")
         p.expect("Do you wish to proceed")
         p.sendline("y")
         p.expect("Press ENTER to continue")
         p.sendline()
-        
+
         p.expect("Select an option")
         p.sendline("q")
 
