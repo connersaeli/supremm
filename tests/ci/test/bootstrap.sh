@@ -19,7 +19,6 @@ case $INSTALL_TYPE in
 esac
 
 ~/bin/services start
-mongod -f /etc/mongod.conf --auth
 
 mkdir -p /data/{phillips,pozidriv,frearson,mortorq,robertson}/{pcp-logs,jobscripts}
 mkdir -p "/data/mortorq/pcp-logs/hostname/2016/12/30"
