@@ -18,7 +18,7 @@ case $INSTALL_TYPE in
     ;;
 esac
 
-~/bin/services start
+~/bin/services restart
 
 mkdir -p /data/{phillips,pozidriv,frearson,mortorq,robertson}/{pcp-logs,jobscripts}
 mkdir -p "/data/mortorq/pcp-logs/hostname/2016/12/30"
